@@ -11,6 +11,3 @@
 // SPDX-License-Identifier: MIT
 //
 //===----------------------------------------------------------------------===//
-
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
