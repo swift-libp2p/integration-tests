@@ -20,39 +20,27 @@ import Testing
 
 @testable import LibP2P
 
+/// Reaches out to a real public IPFS node. Kept deliberately small and marked intermittent — the
+/// remote is fickle and must not be bombarded. Uses the shared ``withNode`` lifecycle helper so the
+/// local node is always torn down.
 @Suite("External Integration Tests", .serialized, .timeLimit(.minutes(5)))
 struct ExternalIntegrationTests {
 
     @Test func testExternalPingMultiaddr() async throws {
         await withKnownIssue("Sometimes we cant reach the external node...", isIntermittent: true) {
-            let app1 = try await makeClient(port: 10_003)
+            try await withNode(muxer: .yamux, security: .noise) { app in
+                let ma = try Multiaddr(
+                    "/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ"
+                )
 
-            try await app1.startup()
+                let ping = try await app.identify.ping(addr: ma)
+                print("Latency: \(ping.nanoseconds) ns")
+                #expect(ping.nanoseconds >= 0)
 
-            let ma = try Multiaddr("/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ")
-
-            let ping = try await app1.identify.ping(addr: ma)
-            print("Latency: \(ping.nanoseconds) ns")
-            #expect(ping.nanoseconds >= 0)
-
-            try await app1.asyncShutdown()
+                let peerInfo = try await app.peers.getPeerInfo(byAddress: ma, on: nil).get()
+                #expect(peerInfo.peer.b58String == "QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ")
+                #expect(peerInfo.addresses.contains(where: { $0 == ma }))
+            }
         }
-    }
-}
-
-extension ExternalIntegrationTests {
-    fileprivate func makeClient(
-        port: Int,
-        logLevel: Logger.Level = .notice
-    ) async throws -> Application {
-        let lib = try await Application.make(.testing, peerID: .ephemeral(type: .Ed25519))
-
-        lib.security.use(.noise)
-        lib.muxers.use(.yamux, .mplex)
-        lib.servers.use(.tcp(host: "127.0.0.1", port: port))
-
-        lib.logger.logLevel = logLevel
-
-        return lib
     }
 }
