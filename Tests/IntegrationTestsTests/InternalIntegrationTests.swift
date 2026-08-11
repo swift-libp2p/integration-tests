@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Foundation
 import LibP2PMPLEX
 import LibP2PNoise
 import LibP2PPlaintext
@@ -20,331 +21,210 @@ import Testing
 
 @testable import LibP2P
 
-@Suite("Internal Integration Tests", .serialized, .timeLimit(.minutes(5)))
-struct InternalIntegrationTests {
+/// End-to-end ping / echo interop between two real `Application` nodes over a loopback TCP socket,
+/// swept across every muxer × security combination.
+///
+/// Lifecycle (make → configure → startup → shutdown) is delegated to the shared ``withPeers``
+/// helper (the networked analogue of `LibP2PTesting.withApp`), so nodes are always torn down — even
+/// when an assertion path throws — and ports are auto-picked (`/tcp/0`) so the suite never collides.
+extension IntegrationTestSuites {
 
-    enum Muxer: CaseIterable {
-        case yamux
-        case mplex
+    @Suite("Internal Integration Tests", .timeLimit(.minutes(5)))
+    struct InternalIntegrationTests {
 
-        var provider: Application.MuxerUpgraders.Provider {
-            switch self {
-            case .yamux: .yamux
-            case .mplex: .mplex
+        @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
+        func testLibP2PInternalPingMultiaddr(muxer: TestMuxer, security: TestSecurity) async throws {
+            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+                host,
+                client in
+                let ping = try await client.identify.ping(addr: host.dialableAddress)
+                print("Latency: \(ping.nanoseconds) ns")
+                #expect(ping.nanoseconds >= 0)
             }
         }
-    }
 
-    enum Security: CaseIterable {
-        case noise
-        case plaintext
+        @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
+        func testLibP2PInternalPingPeer(muxer: TestMuxer, security: TestSecurity) async throws {
+            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+                host,
+                client in
+                try await client.peers.add(peerInfo: host.peerInfo)
 
-        var provider: Application.SecurityUpgraders.Provider {
-            switch self {
-            case .noise: .noise
-            case .plaintext: .plaintextV2
+                let ping = try await client.identify.ping(peer: host.peerID)
+                print("Latency: \(ping.nanoseconds) ns")
+                #expect(ping.nanoseconds >= 0)
             }
         }
-    }
 
-    @Test(arguments: Muxer.allCases, Security.allCases)
-    func testLibP2PInternalPingMultiaddr(muxer: Muxer, security: Security) async throws {
-        let app1 = try await makeClient(port: 10_000, muxer: muxer.provider, security: security.provider)
-        let app2 = try await makeClient(port: 10_001, muxer: muxer.provider, security: security.provider)
+        @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
+        func testLibP2PInternalPingPeerCascadeMultipleInflightPings(
+            muxer: TestMuxer,
+            security: TestSecurity
+        ) async throws {
+            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+                host,
+                client in
+                try await client.peers.add(peerInfo: host.peerInfo)
 
-        try await app1.startup()
-        try await app2.startup()
+                // Note: These pings happen concurrently
+                async let latency1 = client.identify.ping(peer: host.peerID)
+                async let latency2 = client.identify.ping(peer: host.peerID)
+                async let latency3 = client.identify.ping(peer: host.peerID)
 
-        let ma = try app2.listenAddresses.first!.encapsulate(proto: .p2p, address: app2.peerID.b58String)
+                // Even when we await them like this here...
+                let ping1 = try await latency1
+                let ping2 = try await latency2
+                let ping3 = try await latency3
 
-        let ping = try await app1.identify.ping(addr: ma)
-        print("Latency: \(ping.nanoseconds) ns")
-        #expect(ping.nanoseconds >= 0)
+                let connectionCount = try await client.connectionManager.getTotalConnectionCount().get()
+                let streamCount = try await client.connectionManager.getTotalStreamCount().get()
 
-        try await app1.asyncShutdown()
-        try await app2.asyncShutdown()
-    }
+                print("Connection Count: \(connectionCount)")
+                print("Stream Count: \(streamCount)")
 
-    @Test(arguments: Muxer.allCases, Security.allCases)
-    func testLibP2PInternalPingPeer(muxer: Muxer, security: Security) async throws {
-        let app1 = try await makeClient(port: 10_000, muxer: muxer.provider, security: security.provider)
-        let app2 = try await makeClient(port: 10_001, muxer: muxer.provider, security: security.provider)
+                #expect(connectionCount == 1)
+                // 2 streams for ID protocol and 1 stream for all three pings
+                #expect(streamCount == 3)
 
-        try await app1.startup()
-        try await app2.startup()
-
-        do {
-            try await app1.peers.add(peerInfo: app2.peerInfo)
-
-            let ping = try await app1.identify.ping(peer: app2.peerID)
-            print("Latency: \(ping.nanoseconds) ns")
-            #expect(ping.nanoseconds >= 0)
-        } catch {
-            Issue.record(error)
+                // All of the pings should be indentical because all three calls where cascaded into one
+                #expect(ping1 == ping2)
+                #expect(ping2 == ping3)
+            }
         }
 
-        try await app1.asyncShutdown()
-        try await app2.asyncShutdown()
-    }
+        @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
+        func testLibP2PInternalPingPeerSequentialPingsUseSameConnection(
+            muxer: TestMuxer,
+            security: TestSecurity
+        ) async throws {
+            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+                host,
+                client in
+                try await client.peers.add(peerInfo: host.peerInfo)
 
-    @Test(arguments: Muxer.allCases, Security.allCases)
-    func testLibP2PInternalPingPeerCascadeMultipleInflightPings(muxer: Muxer, security: Security) async throws {
-        let app1 = try await makeClient(port: 10_000, muxer: muxer.provider, security: security.provider)
-        let app2 = try await makeClient(port: 10_001, muxer: muxer.provider, security: security.provider)
+                // Note: These pings happen sequentially
+                let ping1 = try await client.identify.ping(peer: host.peerID)
+                let ping2 = try await client.identify.ping(peer: host.peerID)
+                let ping3 = try await client.identify.ping(peer: host.peerID)
 
-        try await app1.startup()
-        try await app2.startup()
+                let connectionCount = try await client.connectionManager.getTotalConnectionCount().get()
+                let streamCount = try await client.connectionManager.getTotalStreamCount().get()
 
-        do {
-            try await app1.peers.add(peerInfo: app2.peerInfo)
+                print("Connection Count: \(connectionCount)")
+                print("Stream Count: \(streamCount)")
 
-            // Note: These pings happen concurrently
-            async let latency1 = app1.identify.ping(peer: app2.peerID)
-            async let latency2 = app1.identify.ping(peer: app2.peerID)
-            async let latency3 = app1.identify.ping(peer: app2.peerID)
+                #expect(connectionCount == 1)
+                // 2 streams for ID protocol and 1 stream for each of the 3 pings
+                #expect(streamCount == 5)
 
-            // Even when we await them like this here...
-            let ping1 = try await latency1
-            let ping2 = try await latency2
-            let ping3 = try await latency3
-
-            let connectionCount = try await app1.connectionManager.getTotalConnectionCount().get()
-            let streamCount = try await app1.connectionManager.getTotalStreamCount().get()
-
-            print("Connection Count: \(connectionCount)")
-            print("Stream Count: \(streamCount)")
-
-            #expect(connectionCount == 1)
-            // 2 streams for ID protocol and 1 stream for all three pings
-            #expect(streamCount == 3)
-
-            // All of the pings should be indentical because all three calls where cascaded into one
-            #expect(ping1 == ping2)
-            #expect(ping2 == ping3)
-        } catch {
-            Issue.record(error)
+                // All three pings should be different because they happened sequentially
+                #expect(ping1 != ping2)
+                #expect(ping2 != ping3)
+            }
         }
 
-        try await app1.asyncShutdown()
-        try await app2.asyncShutdown()
-    }
+        @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
+        func testInternalInterop(muxer: TestMuxer, security: TestSecurity) async throws {
+            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+                let message = Data("Hello Swift LibP2P".utf8)
 
-    @Test(arguments: Muxer.allCases, Security.allCases)
-    func testLibP2PInternalPingPeerSequentialPingsUseSameConnection(muxer: Muxer, security: Security) async throws {
-        let app1 = try await makeClient(port: 10_000, muxer: muxer.provider, security: security.provider)
-        let app2 = try await makeClient(port: 10_001, muxer: muxer.provider, security: security.provider)
-
-        try await app1.startup()
-        try await app2.startup()
-
-        do {
-            try await app1.peers.add(peerInfo: app2.peerInfo)
-
-            // Note: These pings happen sequentially
-            let ping1 = try await app1.identify.ping(peer: app2.peerID)
-            let ping2 = try await app1.identify.ping(peer: app2.peerID)
-            let ping3 = try await app1.identify.ping(peer: app2.peerID)
-
-            let connectionCount = try await app1.connectionManager.getTotalConnectionCount().get()
-            let streamCount = try await app1.connectionManager.getTotalStreamCount().get()
-
-            print("Connection Count: \(connectionCount)")
-            print("Stream Count: \(streamCount)")
-
-            #expect(connectionCount == 1)
-            // 2 streams for ID protocol and 1 stream for each of the 3 pings
-            #expect(streamCount == 5)
-
-            // All three pings should be different because they happened sequentially
-            #expect(ping1 != ping2)
-            #expect(ping2 != ping3)
-        } catch {
-            Issue.record(error)
-        }
-
-        try await app1.asyncShutdown()
-        try await app2.asyncShutdown()
-    }
-
-    @Test(arguments: Muxer.allCases, Security.allCases)
-    func testInternalInterop(muxer: Muxer, security: Security) async throws {
-        let host = try await makeEchoHost(port: 10000, muxer: muxer.provider, security: security.provider)
-        let client = try await makeClient(port: 10001, muxer: muxer.provider, security: security.provider)
-
-        try await host.startup()
-        try await client.startup()
-
-        do {
-            let message: Data = "Hello Swift LibP2P".data(using: .utf8)!
-
-            /// Fire off an echo request
-            let response = try await client.newRequest(
-                to: host.listenAddresses.first!.encapsulate(proto: .p2p, address: host.peerID.b58String),
-                forProtocol: "/echo/1.0.0",
-                withRequest: message,
-                withHandlers: .handlers([.newLineDelimited])
-            ).get()
-
-            #expect(response == message)
-
-            try await Task.sleep(for: .milliseconds(10))
-        } catch {
-            Issue.record(error)
-        }
-
-        try await host.asyncShutdown()
-        try await client.asyncShutdown()
-    }
-
-    @Test(.timeLimit(.minutes(2)), arguments: Muxer.allCases, Security.allCases)
-    func testInternalInteropMultipleRequests_Sequentially(muxer: Muxer, security: Security) async throws {
-        let host = try await makeEchoHost(port: 10000, muxer: muxer.provider, security: security.provider)
-        let client = try await makeClient(port: 10001, muxer: muxer.provider, security: security.provider)
-
-        try await host.startup()
-        try await client.startup()
-
-        let numberOfRequests = 500
-
-        do {
-            // Yamux handles 10_000 requests in ~40 seconds
-            for _ in 0..<numberOfRequests {
                 /// Fire off an echo request
                 let response = try await client.newRequest(
-                    to: host.listenAddresses.first!.encapsulate(proto: .p2p, address: host.peerID.b58String),
+                    to: host.dialableAddress,
                     forProtocol: "/echo/1.0.0",
-                    withRequest: "Hello Swift LibP2P".data(using: .utf8)!,
+                    withRequest: message,
                     withHandlers: .handlers([.newLineDelimited])
                 ).get()
 
-                #expect(response == "Hello Swift LibP2P".data(using: .utf8)!)
+                #expect(response == message)
+
+                try await Task.sleep(for: .milliseconds(10))
             }
-
-            try await Task.sleep(for: .milliseconds(10))
-
-            let connections = try await host.connectionManager.getTotalConnectionCount().get()
-            let streams = try await host.connectionManager.getTotalStreamCount().get()
-
-            #expect(connections == 1)
-            #expect(streams == numberOfRequests + 2)
-        } catch {
-            Issue.record(error)
         }
 
-        try await host.asyncShutdown()
-        try await client.asyncShutdown()
-    }
+        @Test(.timeLimit(.minutes(2)), arguments: TestMuxer.allCases, TestSecurity.allCases)
+        func testInternalInteropMultipleRequests_Sequentially(muxer: TestMuxer, security: TestSecurity) async throws {
+            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+                let addr = try host.dialableAddress
+                let message = Data("Hello Swift LibP2P".utf8)
+                let numberOfRequests = 500
 
-    @Test(.timeLimit(.minutes(2)), arguments: Muxer.allCases, Security.allCases)
-    func testInternalInteropMultipleBidirectionalRequests_Sequentially(muxer: Muxer, security: Security) async throws {
-        let peer1 = try await makeEchoHost(port: 10000, muxer: muxer.provider, security: security.provider)
-        let peer2 = try await makeEchoHost(port: 10001, muxer: muxer.provider, security: security.provider)
+                // Yamux handles 10_000 requests in ~40 seconds
+                for _ in 0..<numberOfRequests {
+                    /// Fire off an echo request
+                    let response = try await client.newRequest(
+                        to: addr,
+                        forProtocol: "/echo/1.0.0",
+                        withRequest: message,
+                        withHandlers: .handlers([.newLineDelimited])
+                    ).get()
 
-        try await peer1.startup()
-        try await peer2.startup()
-
-        let numberOfRequests = 500
-
-        do {
-            let peer1Address = try peer1.listenAddresses.first!.encapsulate(
-                proto: .p2p,
-                address: peer1.peerID.b58String
-            )
-            let peer2Address = try peer2.listenAddresses.first!.encapsulate(
-                proto: .p2p,
-                address: peer2.peerID.b58String
-            )
-
-            // Yamux handles 10_000 requests in ~40 seconds
-            for _ in 0..<numberOfRequests {
-                /// Fire off an echo request
-                async let p1ToP2 = try peer1.newRequest(
-                    to: peer2Address,
-                    forProtocol: "/echo/1.0.0",
-                    withRequest: "Hello from peer1".data(using: .utf8)!,
-                    withHandlers: .handlers([.newLineDelimited])
-                ).get()
-
-                /// Fire off an echo request
-                async let p2ToP1 = try peer2.newRequest(
-                    to: peer1Address,
-                    forProtocol: "/echo/1.0.0",
-                    withRequest: "Hello from peer2".data(using: .utf8)!,
-                    withHandlers: .handlers([.newLineDelimited])
-                ).get()
-
-                let repsonses = try await [p1ToP2, p2ToP1]
-                #expect(repsonses.first == "Hello from peer1".data(using: .utf8)!)
-                #expect(repsonses.last == "Hello from peer2".data(using: .utf8)!)
-            }
-
-            try await Task.sleep(for: .milliseconds(10))
-
-            let connectionsP1 = try await peer1.connectionManager.getTotalConnectionCount().get()
-            let streamsP1 = try await peer1.connectionManager.getTotalStreamCount().get()
-
-            #expect(connectionsP1 == 2)
-            #expect(streamsP1 == (numberOfRequests + 2) * 2)
-
-            let connectionsP2 = try await peer2.connectionManager.getTotalConnectionCount().get()
-            let streamsP2 = try await peer2.connectionManager.getTotalStreamCount().get()
-
-            #expect(connectionsP2 == 2)
-            #expect(streamsP2 == (numberOfRequests + 2) * 2)
-        } catch {
-            Issue.record(error)
-        }
-
-        try await peer1.asyncShutdown()
-        try await peer2.asyncShutdown()
-    }
-}
-
-extension InternalIntegrationTests {
-    fileprivate func makeEchoHost(
-        port: Int,
-        peerID: PeerID? = nil,
-        logLevel: Logger.Level = .notice,
-        muxer: Application.MuxerUpgraders.Provider,
-        security: Application.SecurityUpgraders.Provider
-    ) async throws -> Application {
-        let lib = try await makeClient(port: port, peerID: peerID, logLevel: logLevel, muxer: muxer, security: security)
-
-        lib.routes.group("echo", handlers: [.newLineDelimited]) { echo in
-            echo.on("1.0.0") { req -> Response<ByteBuffer> in
-                switch req.event {
-                case .ready: return .stayOpen
-                case .data(let data): return .respondThenClose(data)
-                case .closed: return .close
-                case .error(let error):
-                    req.logger.error("\(error)")
-                    return .close
+                    #expect(response == message)
                 }
+
+                try await Task.sleep(for: .milliseconds(10))
+
+                let connections = try await host.connectionManager.getTotalConnectionCount().get()
+                let streams = try await host.connectionManager.getTotalStreamCount().get()
+
+                #expect(connections == 1)
+                #expect(streams == numberOfRequests + 2)
             }
         }
 
-        return lib
-    }
+        @Test(.timeLimit(.minutes(2)), arguments: TestMuxer.allCases, TestSecurity.allCases)
+        func testInternalInteropMultipleBidirectionalRequests_Sequentially(
+            muxer: TestMuxer,
+            security: TestSecurity
+        ) async throws {
+            try await withPeers(
+                muxer: muxer.provider,
+                security: security.provider,
+                installEchoOnHost: true,
+                installEchoOnClient: true
+            ) { peer1, peer2 in
+                let peer1Address = try peer1.dialableAddress
+                let peer2Address = try peer2.dialableAddress
+                let numberOfRequests = 500
 
-    fileprivate func makeClient(
-        port: Int,
-        peerID: PeerID? = nil,
-        logLevel: Logger.Level = .notice,
-        muxer: Application.MuxerUpgraders.Provider,
-        security: Application.SecurityUpgraders.Provider
-    ) async throws -> Application {
-        let lib: Application
-        if let peerID {
-            lib = try await Application.make(.testing, peerID: peerID)
-        } else {
-            lib = try await Application.make(.testing, peerID: .ephemeral(type: .Ed25519))
+                // Yamux handles 10_000 requests in ~40 seconds
+                for _ in 0..<numberOfRequests {
+                    /// Fire off an echo request
+                    async let p1ToP2 = peer1.newRequest(
+                        to: peer2Address,
+                        forProtocol: "/echo/1.0.0",
+                        withRequest: Data("Hello from peer1".utf8),
+                        withHandlers: .handlers([.newLineDelimited])
+                    ).get()
+
+                    /// Fire off an echo request
+                    async let p2ToP1 = peer2.newRequest(
+                        to: peer1Address,
+                        forProtocol: "/echo/1.0.0",
+                        withRequest: Data("Hello from peer2".utf8),
+                        withHandlers: .handlers([.newLineDelimited])
+                    ).get()
+
+                    let responses = try await [p1ToP2, p2ToP1]
+                    #expect(responses.first == Data("Hello from peer1".utf8))
+                    #expect(responses.last == Data("Hello from peer2".utf8))
+                }
+
+                try await Task.sleep(for: .milliseconds(10))
+
+                let connectionsP1 = try await peer1.connectionManager.getTotalConnectionCount().get()
+                let streamsP1 = try await peer1.connectionManager.getTotalStreamCount().get()
+
+                #expect(connectionsP1 == 2)
+                #expect(streamsP1 == (numberOfRequests + 2) * 2)
+
+                let connectionsP2 = try await peer2.connectionManager.getTotalConnectionCount().get()
+                let streamsP2 = try await peer2.connectionManager.getTotalStreamCount().get()
+
+                #expect(connectionsP2 == 2)
+                #expect(streamsP2 == (numberOfRequests + 2) * 2)
+            }
         }
-        lib.security.use(security)
-        lib.muxers.use(muxer)
-        lib.servers.use(.tcp(host: "127.0.0.1", port: port))
-
-        lib.logger.logLevel = logLevel
-
-        return lib
     }
+
 }
