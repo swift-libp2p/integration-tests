@@ -27,7 +27,8 @@ import Testing
 struct InMemoryResponderTests {
 
     @Test func echoRouteRespondsInMemory() async throws {
-        try await withApp(configure: { app in installEchoRoute(app) }) { app in
+        let configuration: ((Application) async throws -> Void) = { app in installEchoRoute(app) }
+        try await withApp(configure: configuration) { app in
             let ma = try Multiaddr("/ip4/127.0.0.1/tcp/1234")
             let payload = ByteBuffer(string: "Hello In-Memory")
 
