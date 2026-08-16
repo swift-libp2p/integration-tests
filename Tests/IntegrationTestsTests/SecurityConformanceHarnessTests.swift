@@ -23,17 +23,12 @@ import Testing
 /// package. The muxer partner is the in-package reset-safe wire muxer, so the reset checks stay enabled.
 @Suite("Security Conformance Harness", .serialized)
 struct SecurityConformanceHarnessTests {
-    /// - Note: payloads are capped below Noise's 65535-byte per-message limit. The harness surfaced that
-    ///   `swift-libp2p-noise` does NOT fragment a single write larger than one Noise message: a 64 KB or
-    ///   1 MB `newRequest` times out (the other modules round-trip 1 MB fine). Raising these sizes back to
-    ///   the harness default `[1, 1024, 65_536, 1_048_576]` reproduces the finding. Fix belongs in the
-    ///   Noise module (chunk plaintext into ≤65535-byte Noise messages).
+    
     @Test("noise is conformant and encrypts the wire")
     func noiseIsConformant() async throws {
         let report = try await runSecurityConformance(
             security: .noise,
-            expectedCodec: "/noise",
-            payloadSizes: [1, 1024, 32_768]
+            expectedCodec: "/noise"
         )
         #expect(report.passed, "\(report)")
         // Noise must NOT leave payload bytes in the clear.
@@ -41,6 +36,7 @@ struct SecurityConformanceHarnessTests {
             !report.warnings.contains { $0.contains("in the clear") },
             "noise unexpectedly left bytes in the clear: \(report)"
         )
+        print(report)
     }
 
     @Test("plaintext v2 is conformant (and is, by design, in the clear)")
