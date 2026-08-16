@@ -36,9 +36,12 @@ struct MuxerConformanceHarnessTests {
         #expect(report.passed, "\(report)")
         // Ensure our write promises are succeeded, and only once the bytes land on the socket (not before)
         #expect(!report.warnings.contains { $0.contains("premature") }, "unexpected write-promise advisory; \(report)")
-        #expect(!report.warnings.contains { $0.contains("never completed") }, "unexpected write-promise advisory; \(report)")
+        #expect(
+            !report.warnings.contains { $0.contains("never completed") },
+            "unexpected write-promise advisory; \(report)"
+        )
     }
-    
+
     @Test("yamux is conformant over noise")
     func yamuxIsConformantOverNoise() async throws {
         let report = try await runMuxerConformance(
@@ -50,9 +53,12 @@ struct MuxerConformanceHarnessTests {
         #expect(report.passed, "\(report)")
         // Ensure our write promises are succeeded, and only once the bytes land on the socket (not before)
         #expect(!report.warnings.contains { $0.contains("premature") }, "unexpected write-promise advisory; \(report)")
-        #expect(!report.warnings.contains { $0.contains("never completed") }, "unexpected write-promise advisory; \(report)")
+        #expect(
+            !report.warnings.contains { $0.contains("never completed") },
+            "unexpected write-promise advisory; \(report)"
+        )
     }
-    
+
     @Test("mplex is conformant (write-promise opt-out)")
     func mplexIsConformant() async throws {
         let report = try await runMuxerConformance(
