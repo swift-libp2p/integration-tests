@@ -26,7 +26,7 @@ import Testing
 @Suite("Muxer Conformance Harness", .serialized)
 struct MuxerConformanceHarnessTests {
 
-    @Test("yamux is conformant over built in default")
+    @Test("yamux is conformant")
     func yamuxIsConformant() async throws {
         let report = try await runMuxerConformance(
             muxer: .yamux,
