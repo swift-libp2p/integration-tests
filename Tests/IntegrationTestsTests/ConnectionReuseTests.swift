@@ -132,7 +132,7 @@ extension IntegrationTestSuites {
             do {
                 let addr = try host.dialableAddress
                 let message = Data("doomed".utf8)
-                
+
                 // The following connection will fail due to no common sec protocol
                 let failures = try await withThrowingTaskGroup(of: Bool.self) { group -> Int in
                     for _ in 0..<4 {
