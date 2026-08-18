@@ -26,13 +26,13 @@ extension IntegrationTestSuites {
     /// networked suites with a fast, socket-free check of route wiring.
     @Suite("In-Memory Responder Tests", .serialized)
     struct InMemoryResponderTests {
-        
+
         @Test func echoRouteRespondsInMemory() async throws {
             let configuration: ((Application) async throws -> Void) = { app in installEchoRoute(app) }
             try await withApp(configure: configuration) { app in
                 let ma = try Multiaddr("/ip4/127.0.0.1/tcp/1234")
                 let payload = ByteBuffer(string: "Hello In-Memory")
-                
+
                 try await app.testing().test(ma, protocol: "/echo/1.0.0", payload: payload) { response in
                     // `ByteBuffer.string` comes from LibP2PTestUtils.
                     #expect(response.payload.string == "Hello In-Memory")

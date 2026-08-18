@@ -26,18 +26,18 @@ extension IntegrationTestSuites {
     /// local node is always torn down.
     @Suite("External Integration Tests", .serialized, .timeLimit(.minutes(5)))
     struct ExternalIntegrationTests {
-        
+
         @Test func testExternalPingMultiaddr() async throws {
             await withKnownIssue("Sometimes we cant reach the external node...", isIntermittent: true) {
                 try await withNode(muxer: .yamux, security: .noise) { app in
                     let ma = try Multiaddr(
                         "/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ"
                     )
-                    
+
                     let ping = try await app.identify.ping(addr: ma)
                     print("Latency: \(ping.nanoseconds) ns")
                     #expect(ping.nanoseconds >= 0)
-                    
+
                     let peerInfo = try await app.peers.getPeerInfo(byAddress: ma, on: nil).get()
                     #expect(peerInfo.peer.b58String == "QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ")
                     #expect(peerInfo.addresses.contains(where: { $0 == ma }))

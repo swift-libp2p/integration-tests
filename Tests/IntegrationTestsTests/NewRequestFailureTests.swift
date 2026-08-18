@@ -33,7 +33,7 @@ extension IntegrationTestSuites {
     /// request timeout is used so that a regression to slow-fail would blow past the `elapsed` bound).
     @Suite("newRequest failure handling", .serialized)
     struct NewRequestFailureTests {
-        @Test("Dial to a mismatched peer ID rejects quickly (does not hang, does not wait the timeout)", .timeLimit(.minutes(1)))
+        @Test("Dial to a mismatched peer ID rejects quickly (does not wait the timeout)", .timeLimit(.minutes(1)))
         func mismatchedPeerIDDialRejectsFast() async throws {
             try await withPeers(muxer: .yamux, security: .noise) { host, client in
                 guard let base = host.listenAddresses.first else {
@@ -43,7 +43,7 @@ extension IntegrationTestSuites {
                 // Encapsulate the host's real ip/tcp address with the WRONG peer ID (the client's own), so the
                 // security handshake yields a peer that doesn't match what we expected.
                 let bogusAddr = try base.encapsulate(proto: .p2p, address: client.peerID.b58String)
-                
+
                 let start = Date()
                 do {
                     _ = try await client.newRequest(

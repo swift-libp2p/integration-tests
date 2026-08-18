@@ -26,7 +26,7 @@ extension IntegrationTestSuites {
     /// under the defaults now that both muxers are conformant
     @Suite("Muxer Conformance Harness", .serialized)
     struct MuxerConformanceHarnessTests {
-        
+
         @Test("yamux is conformant")
         func yamuxIsConformant() async throws {
             let report = try await runMuxerConformance(
@@ -35,7 +35,10 @@ extension IntegrationTestSuites {
             )
             #expect(report.passed, "\(report)")
             // Ensure our write promises are succeeded, and only once the bytes land on the socket (not before)
-            #expect(!report.warnings.contains { $0.contains("premature") }, "unexpected write-promise advisory; \(report)")
+            #expect(
+                !report.warnings.contains { $0.contains("premature") },
+                "unexpected write-promise advisory; \(report)"
+            )
             #expect(
                 !report.warnings.contains { $0.contains("never completed") },
                 "unexpected write-promise advisory; \(report)"
@@ -46,7 +49,7 @@ extension IntegrationTestSuites {
                 "node not serviceable after malformed input; \(report)"
             )
         }
-        
+
         @Test("yamux is conformant over noise")
         func yamuxIsConformantOverNoise() async throws {
             let report = try await runMuxerConformance(
@@ -56,7 +59,10 @@ extension IntegrationTestSuites {
             )
             #expect(report.passed, "\(report)")
             // Ensure our write promises are succeeded, and only once the bytes land on the socket (not before)
-            #expect(!report.warnings.contains { $0.contains("premature") }, "unexpected write-promise advisory; \(report)")
+            #expect(
+                !report.warnings.contains { $0.contains("premature") },
+                "unexpected write-promise advisory; \(report)"
+            )
             #expect(
                 !report.warnings.contains { $0.contains("never completed") },
                 "unexpected write-promise advisory; \(report)"
@@ -67,7 +73,7 @@ extension IntegrationTestSuites {
                 "node not serviceable after malformed input; \(report)"
             )
         }
-        
+
         @Test("mplex is conformant")
         func mplexIsConformant() async throws {
             let report = try await runMuxerConformance(
@@ -76,7 +82,10 @@ extension IntegrationTestSuites {
             )
             #expect(report.passed, "\(report)")
             // Ensure our write promises are succeeded, and only once the bytes land on the socket (not before)
-            #expect(!report.warnings.contains { $0.contains("premature") }, "unexpected write-promise advisory; \(report)")
+            #expect(
+                !report.warnings.contains { $0.contains("premature") },
+                "unexpected write-promise advisory; \(report)"
+            )
             #expect(
                 !report.warnings.contains { $0.contains("never completed") },
                 "unexpected write-promise advisory; \(report)"
@@ -87,7 +96,7 @@ extension IntegrationTestSuites {
                 "node not serviceable after malformed input; \(report)"
             )
         }
-        
+
         @Test("mplex is conformant over noise")
         func mplexIsConformantOverNoise() async throws {
             let report = try await runMuxerConformance(
@@ -97,7 +106,10 @@ extension IntegrationTestSuites {
             )
             #expect(report.passed, "\(report)")
             // Ensure our write promises are succeeded, and only once the bytes land on the socket (not before)
-            #expect(!report.warnings.contains { $0.contains("premature") }, "unexpected write-promise advisory; \(report)")
+            #expect(
+                !report.warnings.contains { $0.contains("premature") },
+                "unexpected write-promise advisory; \(report)"
+            )
             #expect(
                 !report.warnings.contains { $0.contains("never completed") },
                 "unexpected write-promise advisory; \(report)"
