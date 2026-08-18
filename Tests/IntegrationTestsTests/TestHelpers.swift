@@ -232,7 +232,7 @@ extension Application {
     /// runners. On top of that, the request is retried up to `attempts` times *only* on a spurious
     /// `.TimedOut` — a timed-out round-trip on the loopback path is almost always transient runner
     /// contention, so a fresh attempt over the (now-warm) connection typically succeeds. A genuine
-    /// hang still fails once the attempts are exhausted, and any *other* error (e.g. a failed
+    /// stall still fails once the attempts are exhausted, and any *other* error (e.g. a failed
     /// upgrade) propagates immediately without retrying, so real failures aren't masked.
     @discardableResult
     func echo(
