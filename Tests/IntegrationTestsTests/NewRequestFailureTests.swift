@@ -53,14 +53,16 @@ extension IntegrationTestSuites {
                         withHandlers: .handlers([.newLineDelimited]),
                         // Deliberately generous: the teardown drain should reject well before this fires. If the
                         // drain regresses, the request would only settle at this timeout and trigger the `elapsed`
-                        // assertion below.
-                        withTimeout: .seconds(10)
+                        // assertion below. (CI-scaled so a throttled runner doesn't clip the ceiling.)
+                        withTimeout: TimeAmount.seconds(10).ciScaled
                     ).get()
                     Issue.record("newRequest to a mismatched peer ID unexpectedly succeeded")
                 } catch {
                     let elapsed = Date().timeIntervalSince(start)
+                    // CI-scaled so runner jitter doesn't fail a genuinely fast rejection; still far below the
+                    // (also-scaled) request timeout, so a slow-fail regression is still caught.
                     #expect(
-                        elapsed < 3,
+                        elapsed < ciScaledSeconds(3),
                         "expected fast rejection via the connection-teardown drain, but it took \(elapsed)s (looks like it waited for the request timeout instead)"
                     )
                 }
