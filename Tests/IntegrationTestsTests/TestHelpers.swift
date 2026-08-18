@@ -17,10 +17,6 @@ import LibP2PCore
 import LibP2PMPLEX
 import LibP2PNoise
 import LibP2PPlaintext
-// `LibP2PTesting` re-exports `LibP2P` + `LibP2PTestUtils`, giving us the `withApp` lifecycle
-// helper, the in-memory `TestingApplicationTester`, the `MockMuxer`/`MockSecurity` doubles and
-// the `ByteBuffer.string` convenience. These integration helpers mirror the `withApp` idiom for
-// nodes that need a *real* transport / muxer / security stack stood up over a loopback socket.
 import LibP2PTesting
 import LibP2PYAMUX
 import NIOConcurrencyHelpers
@@ -184,9 +180,6 @@ func withPeers<T>(
 /// of these). Detected once at load time.
 let isRunningInCI: Bool = {
     let env = ProcessInfo.processInfo.environment
-    print("Env")
-    print(env)
-    print("-----")
     return env["CI"] != nil || env["GITHUB_ACTIONS"] != nil
 }()
 
