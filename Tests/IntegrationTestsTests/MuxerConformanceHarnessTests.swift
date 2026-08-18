@@ -102,7 +102,7 @@ extension IntegrationTestSuites {
             let report = try await runMuxerConformance(
                 muxer: .mplex,
                 expectedCodec: "/mplex/6.7.0",
-                security: .noise,
+                security: .noise
             )
             #expect(report.passed, "\(report)")
             // Ensure our write promises are succeeded, and only once the bytes land on the socket (not before)
