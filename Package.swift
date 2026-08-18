@@ -26,13 +26,13 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p.git", .upToNextMinor(from: "0.3.5")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p.git", .upToNextMinor(from: "0.3.8")),
 
         // Test Dependencies
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-yamux.git", .upToNextMinor(from: "0.2.0")),
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-mplex.git", .upToNextMinor(from: "0.2.0")),
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-noise.git", .upToNextMinor(from: "0.2.0")),
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-plaintext.git", .upToNextMinor(from: "0.2.0")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-yamux.git", .upToNextMinor(from: "0.3.0")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-mplex.git", .upToNextMinor(from: "0.3.0")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-noise.git", .upToNextMinor(from: "0.3.0")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-plaintext.git", .upToNextMinor(from: "0.3.0")),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.

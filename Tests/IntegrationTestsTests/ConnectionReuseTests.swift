@@ -69,33 +69,97 @@ extension IntegrationTestSuites {
             }
         }
 
-        /// Desired end-state: several requests dialed *simultaneously from cold* to the same peer should
-        /// coalesce onto a single connection.
-        ///
-        /// - Note: This is currently a **known gap** — address-based dialing has no in-flight dial
-        ///   coalescing, so each concurrent cold `newRequest` opens its own connection. The test is
-        ///   wrapped in `withKnownIssue` so the suite stays green while recording the deviation; if dial
-        ///   coalescing is ever implemented, this will start passing and flag that the guard can be
-        ///   removed. Kept intentionally small to limit the connection burst.
+        /// Several requests dialed simultaneously from cold to the same multiaddr must coalesce onto a
+        /// single connection: the first dial establishes the connection and the rest ride it once it
+        /// upgrades, rather than each opening its own.
         @Test func concurrentColdDialsToSamePeerShouldCoalesce() async throws {
             try await withPeers { host, client in
                 let addr = try host.dialableAddress
                 let message = Data("cold".utf8)
 
-                await withKnownIssue(
-                    "Address-based dialing does not yet coalesce concurrent in-flight dials",
-                    isIntermittent: true
-                ) {
+                try await withThrowingTaskGroup(of: Data.self) { group in
+                    for _ in 0..<8 {
+                        group.addTask { try await client.echo(message, to: addr) }
+                    }
+                    // Every coalesced request still gets its own correct echo back.
+                    for try await response in group {
+                        #expect(response == message)
+                    }
+                }
+
+                let total = try await client.connectionManager.getTotalConnectionCount().get()
+                #expect(total == 1)
+            }
+        }
+
+        /// Coalescing keys on the dialed multiaddr, so concurrent cold dials to two different peers must
+        /// stay independent — one connection per peer, never collapsed together.
+        @Test func concurrentColdDialsToDifferentPeersStayIndependent() async throws {
+            try await withPeers { hostA, client in
+                try await withNode(installEcho: true) { hostB in
+                    let addrA = try hostA.dialableAddress
+                    let addrB = try hostB.dialableAddress
+                    let message = Data("independent".utf8)
+
                     try await withThrowingTaskGroup(of: Data.self) { group in
                         for _ in 0..<4 {
-                            group.addTask { try await client.echo(message, to: addr) }
+                            group.addTask { try await client.echo(message, to: addrA) }
+                            group.addTask { try await client.echo(message, to: addrB) }
                         }
-                        for try await _ in group {}
+                        for try await response in group {
+                            #expect(response == message)
+                        }
                     }
+
+                    // One connection to each distinct peer — the two dial targets did not coalesce.
                     let total = try await client.connectionManager.getTotalConnectionCount().get()
-                    #expect(total == 1)
+                    #expect(total == 2)
                 }
             }
+        }
+
+        /// When the underlying connection a batch of coalesced cold dials is riding fails to upgrade,
+        /// every queued request must fail (fast) rather than waiting on a connection that will never
+        /// be upgraded.
+        @Test func concurrentColdDialsThatFailToUpgradeFailAllCallers() async throws {
+            // Instantiate two nodes with different security protocols
+            let host = try await makeNode(security: .plaintextV2)
+            installEchoRoute(host)
+            let client = try await makeNode(security: .noise)
+            try await host.startup()
+            try await client.startup()
+
+            do {
+                let addr = try host.dialableAddress
+                let message = Data("doomed".utf8)
+
+                // The following connection will fail due to no common sec protocol
+                let failures = try await withThrowingTaskGroup(of: Bool.self) { group -> Int in
+                    for _ in 0..<4 {
+                        group.addTask {
+                            do {
+                                _ = try await client.echo(message, to: addr, timeout: .seconds(10))
+                                return false
+                            } catch {
+                                return true
+                            }
+                        }
+                    }
+                    var count = 0
+                    for try await didFail in group where didFail { count += 1 }
+                    return count
+                }
+
+                // Every coalesced request surfaced the failed upgrade.
+                #expect(failures == 4)
+            } catch {
+                try? await client.asyncShutdown()
+                try? await host.asyncShutdown()
+                throw error
+            }
+
+            try await client.asyncShutdown()
+            try await host.asyncShutdown()
         }
     }
 
