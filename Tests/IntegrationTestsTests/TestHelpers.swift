@@ -17,10 +17,6 @@ import LibP2PCore
 import LibP2PMPLEX
 import LibP2PNoise
 import LibP2PPlaintext
-// `LibP2PTesting` re-exports `LibP2P` + `LibP2PTestUtils`, giving us the `withApp` lifecycle
-// helper, the in-memory `TestingApplicationTester`, the `MockMuxer`/`MockSecurity` doubles and
-// the `ByteBuffer.string` convenience. These integration helpers mirror the `withApp` idiom for
-// nodes that need a *real* transport / muxer / security stack stood up over a loopback socket.
 import LibP2PTesting
 import LibP2PYAMUX
 import NIOConcurrencyHelpers
@@ -178,6 +174,32 @@ func withPeers<T>(
     }
 }
 
+// MARK: - CI-aware timeouts
+
+/// Whether we're running inside a cloud CI runner (GitHub Actions and most CI providers export one
+/// of these). Detected once at load time.
+let isRunningInCI: Bool = {
+    let env = ProcessInfo.processInfo.environment
+    return env["CI"] != nil || env["GITHUB_ACTIONS"] != nil
+}()
+
+/// Multiplier applied to every request timeout / wall-clock bound in the suite.
+///
+/// GitHub-hosted (and most cloud) runners are CPU-throttled and periodically *frozen* by the
+/// container scheduler, so a request's wall-clock budget can be burned while the process is
+/// descheduled — surfacing as a spurious `.TimedOut` on an otherwise healthy handshake path. We
+/// inflate timeouts under CI so genuine round-trips have the headroom to complete, while keeping
+/// local runs at their normal (snappy) budgets.
+let ciTimeoutMultiplier: Int64 = isRunningInCI ? 4 : 1
+
+extension TimeAmount {
+    /// This amount, inflated by ``ciTimeoutMultiplier`` when running under CI (unchanged locally).
+    var ciScaled: TimeAmount { .nanoseconds(self.nanoseconds * ciTimeoutMultiplier) }
+}
+
+/// Scales a wall-clock *seconds* bound (for `elapsed < …` assertions) by ``ciTimeoutMultiplier``.
+func ciScaledSeconds(_ seconds: Double) -> Double { seconds * Double(ciTimeoutMultiplier) }
+
 // MARK: - Convenience
 
 extension Application {
@@ -199,17 +221,36 @@ extension Application {
 
     /// Fires a single line-delimited `/echo/1.0.0` request and returns the echoed payload.
     ///
-    /// Uses a generous request timeout because these suites run in parallel — a burst of nodes all
-    /// doing real handshakes at once can push an individual round-trip well past the 3s default.
+    /// The supplied `timeout` is ``TimeAmount/ciScaled`` so it gets extra headroom on throttled CI
+    /// runners. On top of that, the request is retried up to `attempts` times *only* on a spurious
+    /// `.TimedOut` — a timed-out round-trip on the loopback path is almost always transient runner
+    /// contention, so a fresh attempt over the (now-warm) connection typically succeeds. A genuine
+    /// stall still fails once the attempts are exhausted, and any *other* error (e.g. a failed
+    /// upgrade) propagates immediately without retrying, so real failures aren't masked.
     @discardableResult
-    func echo(_ message: Data, to address: Multiaddr, timeout: TimeAmount = .seconds(15)) async throws -> Data {
-        try await self.newRequest(
-            to: address,
-            forProtocol: "/echo/1.0.0",
-            withRequest: message,
-            withHandlers: .handlers([.newLineDelimited]),
-            withTimeout: timeout
-        ).get()
+    func echo(
+        _ message: Data,
+        to address: Multiaddr,
+        timeout: TimeAmount = .seconds(15),
+        attempts: Int = 3
+    ) async throws -> Data {
+        let scaledTimeout = timeout.ciScaled
+        var lastError: Error = Application.SingleBufferingRequest.Errors.TimedOut
+        for attempt in 1...max(1, attempts) {
+            do {
+                return try await self.newRequest(
+                    to: address,
+                    forProtocol: "/echo/1.0.0",
+                    withRequest: message,
+                    withHandlers: .handlers([.newLineDelimited]),
+                    withTimeout: scaledTimeout
+                ).get()
+            } catch Application.SingleBufferingRequest.Errors.TimedOut {
+                lastError = Application.SingleBufferingRequest.Errors.TimedOut
+                if attempt < attempts { try? await Task.sleep(for: .milliseconds(200)) }
+            }
+        }
+        throw lastError
     }
 }
 

@@ -26,10 +26,10 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p.git", .upToNextMinor(from: "0.3.8")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p.git", .upToNextMinor(from: "0.3.9")),
 
         // Test Dependencies
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-yamux.git", .upToNextMinor(from: "0.3.0")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-yamux.git", .upToNextMinor(from: "0.3.2")),
         .package(url: "https://github.com/swift-libp2p/swift-libp2p-mplex.git", .upToNextMinor(from: "0.3.0")),
         .package(url: "https://github.com/swift-libp2p/swift-libp2p-noise.git", .upToNextMinor(from: "0.3.0")),
         .package(url: "https://github.com/swift-libp2p/swift-libp2p-plaintext.git", .upToNextMinor(from: "0.3.0")),

@@ -17,16 +17,16 @@ import Testing
 
 @testable import LibP2P
 
-/// Verifies connection re-use: repeated requests to the same peer over the same transport ride a
-/// single connection rather than opening one per request.
-///
-/// `getTotalConnectionCount()` is a monotonic counter of every connection ever opened, so asserting
-/// it stays `1` is immune to the idle-teardown timing that a live count would be subject to.
 extension IntegrationTestSuites {
 
     @Suite("Connection Reuse Tests", .timeLimit(.minutes(2)))
     struct ConnectionReuseTests {
 
+        /// Verifies connection re-use: repeated requests to the same peer over the same transport ride a
+        /// single connection rather than opening one per request.
+        ///
+        /// `getTotalConnectionCount()` is a monotonic counter of every connection ever opened, so asserting
+        /// it stays `1` is immune to the idle-teardown timing that a live count would be subject to.
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func sequentialRequestsReuseASingleConnection(muxer: TestMuxer, security: TestSecurity) async throws {
             try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
