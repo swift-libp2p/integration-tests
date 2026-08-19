@@ -87,7 +87,7 @@ Notes:
 
 ## Known Gaps
 
-- **Concurrent cold-dial coalescing.** Several requests dialed *simultaneously from cold* to the same peer via `newRequest(to: Multiaddr)` currently open one connection each rather than coalescing onto a single connection (address-based dialing has no in-flight dial de-duplication). The desired end-state is captured by `ConnectionReuseTests/concurrentColdDialsToSamePeerShouldCoalesce`, wrapped in `withKnownIssue` so the suite stays green while recording the deviation — it will start failing (and thereby flag that the guard can be removed) once dial coalescing is implemented. Note that concurrent *pings* to the same peer, and concurrent requests over an *already-established* connection, both already reuse a single connection.
+- None right now. Submit a bug report!
 
 ## Contributing
 
