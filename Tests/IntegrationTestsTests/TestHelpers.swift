@@ -69,6 +69,7 @@ func makeNode(
     muxer: Application.MuxerUpgraders.Provider = .yamux,
     security: Application.SecurityUpgraders.Provider = .noise,
     enableAutomaticStreamCounting: Bool = false,
+    connectionType: AppConnection.Type? = nil,
     logLevel: Logger.Level = .error
 ) async throws -> Application {
     let app: Application
@@ -88,6 +89,8 @@ func makeNode(
     app.security.use(security)
     app.muxers.use(muxer)
     app.servers.use(.tcp(host: "127.0.0.1", port: port))
+    // If a connectionType is specified, install it
+    if let connectionType { app.connectionManager.use(connectionType: connectionType) }
     app.logger.logLevel = logLevel
     return app
 }
@@ -117,13 +120,15 @@ func withNode<T>(
     muxer: Application.MuxerUpgraders.Provider = .yamux,
     security: Application.SecurityUpgraders.Provider = .noise,
     enableAutomaticStreamCounting: Bool = false,
+    connectionType: AppConnection.Type? = nil,
     installEcho: Bool = false,
     _ body: (Application) async throws -> T
 ) async throws -> T {
     let app = try await makeNode(
         muxer: muxer,
         security: security,
-        enableAutomaticStreamCounting: enableAutomaticStreamCounting
+        enableAutomaticStreamCounting: enableAutomaticStreamCounting,
+        connectionType: connectionType
     )
     if installEcho { installEchoRoute(app) }
     do {
@@ -144,6 +149,7 @@ func withPeers<T>(
     muxer: Application.MuxerUpgraders.Provider = .yamux,
     security: Application.SecurityUpgraders.Provider = .noise,
     enableAutomaticStreamCounting: Bool = false,
+    connectionType: AppConnection.Type? = nil,
     installEchoOnHost: Bool = true,
     installEchoOnClient: Bool = false,
     _ body: (_ host: Application, _ client: Application) async throws -> T
@@ -151,12 +157,14 @@ func withPeers<T>(
     let host = try await makeNode(
         muxer: muxer,
         security: security,
-        enableAutomaticStreamCounting: enableAutomaticStreamCounting
+        enableAutomaticStreamCounting: enableAutomaticStreamCounting,
+        connectionType: connectionType
     )
     let client = try await makeNode(
         muxer: muxer,
         security: security,
-        enableAutomaticStreamCounting: enableAutomaticStreamCounting
+        enableAutomaticStreamCounting: enableAutomaticStreamCounting,
+        connectionType: connectionType
     )
     if installEchoOnHost { installEchoRoute(host) }
     if installEchoOnClient { installEchoRoute(client) }
