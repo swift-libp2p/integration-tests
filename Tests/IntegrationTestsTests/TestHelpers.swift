@@ -70,6 +70,7 @@ func makeNode(
     security: Application.SecurityUpgraders.Provider = .noise,
     enableAutomaticStreamCounting: Bool = false,
     connectionType: AppConnection.Type? = nil,
+    idleTimeout: TimeAmount? = .milliseconds(500),
     logLevel: Logger.Level = .error
 ) async throws -> Application {
     let app: Application
@@ -91,6 +92,8 @@ func makeNode(
     app.servers.use(.tcp(host: "127.0.0.1", port: port))
     // If a connectionType is specified, install it
     if let connectionType { app.connectionManager.use(connectionType: connectionType) }
+    // If an idleTimeout is specified, install it (otherwise we inherit the library default)
+    if let idleTimeout { app.connectionManager.setIdleTimeout(idleTimeout) }
     app.logger.logLevel = logLevel
     return app
 }
