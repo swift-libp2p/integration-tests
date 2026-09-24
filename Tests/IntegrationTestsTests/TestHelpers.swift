@@ -77,7 +77,7 @@ func makeNode(
     if let peerID {
         app = try await Application.make(
             .testing,
-            peerID: peerID,
+            peerID: .existing(peerID),
             enableAutomaticStreamCounting: enableAutomaticStreamCounting
         )
     } else {
@@ -246,7 +246,7 @@ extension Application {
         attempts: Int = 3
     ) async throws -> Data {
         let scaledTimeout = timeout.ciScaled
-        var lastError: Error = Application.SingleBufferingRequest.Errors.TimedOut
+        var lastError: Error = Application.SingleRequestError.timedOut
         for attempt in 1...max(1, attempts) {
             do {
                 return try await self.newRequest(
@@ -256,8 +256,8 @@ extension Application {
                     withHandlers: .handlers([.newLineDelimited]),
                     withTimeout: scaledTimeout
                 ).get()
-            } catch Application.SingleBufferingRequest.Errors.TimedOut {
-                lastError = Application.SingleBufferingRequest.Errors.TimedOut
+            } catch Application.SingleRequestError.timedOut {
+                lastError = Application.SingleRequestError.timedOut
                 if attempt < attempts { try? await Task.sleep(for: .milliseconds(200)) }
             }
         }
