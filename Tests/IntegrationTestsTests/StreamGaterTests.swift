@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -26,7 +27,7 @@ extension IntegrationTestSuites {
         /// without taking the whole connection down with it. This is the end-to-end proof that the stream gater's
         /// approved protocol list is what multistream-select gets configured with on the real inbound path.
         @Test func aRejectingGaterBlocksTheProtocolButKeepsTheConnection() async throws {
-            try await withPeers(connectionType: BaseConnection.self) { host, client in
+            try await withPeers(configure: testStack(connectionType: BaseConnection.self)) { host, client in
                 host.logger.logLevel = .debug
                 // Gate the *host*: it's the side that receives the inbound `/echo/1.0.0` stream.
                 host.connectionManager.use(streamGater: DenyProtocolStreamGater(denying: "/echo/1.0.0"))

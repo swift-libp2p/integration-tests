@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -30,7 +31,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func fullConnectionLifecycleIsPublished(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 let recorder = EventRecorder()
                 recorder.subscribe(to: client)
 
@@ -57,7 +58,7 @@ extension IntegrationTestSuites {
         /// inbound connection.
         @Test(arguments: TestMuxer.allCases)
         func listenerObservesInboundConnectionLifecycle(muxer: TestMuxer) async throws {
-            try await withPeers(muxer: muxer.provider, security: TestSecurity.noise.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer)) { host, client in
                 let hostRecorder = EventRecorder()
                 hostRecorder.subscribe(to: host)
 

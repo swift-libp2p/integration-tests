@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -29,7 +30,7 @@ extension IntegrationTestSuites {
         /// it stays `1` is immune to the idle-teardown timing that a live count would be subject to.
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func sequentialRequestsReuseASingleConnection(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 let addr = try host.dialableAddress
                 let message = Data("reuse".utf8)
 
@@ -47,7 +48,7 @@ extension IntegrationTestSuites {
         /// connection rather than each dialing a new one.
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func concurrentRequestsReuseAnEstablishedConnection(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 let addr = try host.dialableAddress
                 let message = Data("warm".utf8)
 
@@ -73,7 +74,7 @@ extension IntegrationTestSuites {
         /// single connection: the first dial establishes the connection and the rest ride it once it
         /// upgrades, rather than each opening its own.
         @Test func concurrentColdDialsToSamePeerShouldCoalesce() async throws {
-            try await withPeers { host, client in
+            try await withPeers(configure: testStack()) { host, client in
                 let addr = try host.dialableAddress
                 let message = Data("cold".utf8)
 
@@ -95,8 +96,8 @@ extension IntegrationTestSuites {
         /// Coalescing keys on the dialed multiaddr, so concurrent cold dials to two different peers must
         /// stay independent — one connection per peer, never collapsed together.
         @Test func concurrentColdDialsToDifferentPeersStayIndependent() async throws {
-            try await withPeers { hostA, client in
-                try await withNode(installEcho: true) { hostB in
+            try await withPeers(configure: testStack()) { hostA, client in
+                try await withNode(installEcho: true, configure: testStack()) { hostB in
                     let addrA = try hostA.dialableAddress
                     let addrB = try hostB.dialableAddress
                     let message = Data("independent".utf8)
@@ -123,9 +124,9 @@ extension IntegrationTestSuites {
         /// be upgraded.
         @Test func concurrentColdDialsThatFailToUpgradeFailAllCallers() async throws {
             // Instantiate two nodes with different security protocols
-            let host = try await makeNode(security: .plaintextV2)
-            installEchoRoute(host)
-            let client = try await makeNode(security: .noise)
+            let host = try await makeTestNode(configure: testStack(security: .plaintext))
+            host.installEchoRoute()
+            let client = try await makeTestNode(configure: testStack(security: .noise))
             try await host.startup()
             try await client.startup()
 

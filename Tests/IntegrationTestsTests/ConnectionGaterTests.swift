@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -23,7 +24,7 @@ extension IntegrationTestSuites {
     struct ConnectionGaterTests {
 
         @Test func anAllowAllGaterLetsTheConnectionThrough() async throws {
-            try await withPeers(connectionType: BaseConnection.self) { host, client in
+            try await withPeers(configure: testStack(connectionType: BaseConnection.self)) { host, client in
                 host.connectionManager.use(connectionGater: AllowAllConnectionGater())
                 client.connectionManager.use(connectionGater: AllowAllConnectionGater())
 
@@ -38,7 +39,7 @@ extension IntegrationTestSuites {
         }
 
         @Test func aSecuredHookDenialClosesTheConnection() async throws {
-            try await withPeers(connectionType: BaseConnection.self) { host, client in
+            try await withPeers(configure: testStack(connectionType: BaseConnection.self)) { host, client in
                 // Install a ConnectionGater that rejects the client's PeerID
                 host.connectionManager.use(
                     connectionGater: DenyPeerConnectionGater(denying: client.peerID)
@@ -60,7 +61,7 @@ extension IntegrationTestSuites {
         /// before any handshake runs: the connection is never registered with the host's manager and
         /// the secured hook — which requires an authenticated peer — is never consulted.
         @Test func anAcceptHookDenialRefusesInboundBeforeTheHandshake() async throws {
-            try await withPeers(connectionType: BaseConnection.self) { host, client in
+            try await withPeers(configure: testStack(connectionType: BaseConnection.self)) { host, client in
                 let gater = DenyInboundConnectionGater()
                 host.connectionManager.use(connectionGater: gater)
 

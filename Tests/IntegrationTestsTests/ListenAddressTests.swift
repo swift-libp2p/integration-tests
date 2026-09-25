@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -25,7 +26,7 @@ extension IntegrationTestSuites {
     struct ListenAddressTests {
 
         @Test func automaticPortPickingProducesAConcreteAddress() async throws {
-            try await withNode { app in
+            try await withNode(configure: testStack()) { app in
                 let addresses = app.listenAddresses
                 #expect(!addresses.isEmpty)
 
@@ -38,7 +39,7 @@ extension IntegrationTestSuites {
         }
 
         @Test func twoNodesReceiveDistinctPorts() async throws {
-            try await withPeers(installEchoOnHost: false) { host, client in
+            try await withPeers(installEchoOnHost: false, configure: testStack()) { host, client in
                 let hostPort = host.listenAddresses.first?.tcpAddress?.port
                 let clientPort = client.listenAddresses.first?.tcpAddress?.port
                 #expect(hostPort != nil)
@@ -49,7 +50,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func announcedAddressIsDialable(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 // Dial the host using only its self-announced listen address.
                 let announced = try #require(host.listenAddresses.first)
                 #expect(announced.tcpAddress?.port != 0)

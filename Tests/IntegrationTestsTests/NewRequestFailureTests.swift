@@ -35,7 +35,7 @@ extension IntegrationTestSuites {
     struct NewRequestFailureTests {
         @Test("Dial to a mismatched peer ID rejects quickly (does not wait the timeout)", .timeLimit(.minutes(1)))
         func mismatchedPeerIDDialRejectsFast() async throws {
-            try await withPeers(muxer: .yamux, security: .noise) { host, client in
+            try await withPeers(configure: testStack()) { host, client in
                 guard let base = host.listenAddresses.first else {
                     Issue.record("host announced no listen address")
                     return

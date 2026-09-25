@@ -17,6 +17,7 @@ import LibP2PMPLEX
 import LibP2PNoise
 import LibP2PPlaintext
 import LibP2PYAMUX
+import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -34,7 +35,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func testLibP2PInternalPingMultiaddr(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+            try await withPeers(installEchoOnHost: false, configure: testStack(muxer: muxer, security: security)) {
                 host,
                 client in
                 let ping = try await client.identify.ping(addr: host.dialableAddress)
@@ -45,7 +46,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func testLibP2PInternalPingPeer(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+            try await withPeers(installEchoOnHost: false, configure: testStack(muxer: muxer, security: security)) {
                 host,
                 client in
                 try await client.peers.add(peerInfo: host.peerInfo)
@@ -61,7 +62,7 @@ extension IntegrationTestSuites {
             muxer: TestMuxer,
             security: TestSecurity
         ) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+            try await withPeers(installEchoOnHost: false, configure: testStack(muxer: muxer, security: security)) {
                 host,
                 client in
                 try await client.peers.add(peerInfo: host.peerInfo)
@@ -97,7 +98,7 @@ extension IntegrationTestSuites {
             muxer: TestMuxer,
             security: TestSecurity
         ) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+            try await withPeers(installEchoOnHost: false, configure: testStack(muxer: muxer, security: security)) {
                 host,
                 client in
                 try await client.peers.add(peerInfo: host.peerInfo)
@@ -125,7 +126,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func testInternalInterop(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 let message = Data("Hello Swift LibP2P".utf8)
 
                 /// Fire off an echo request
@@ -145,7 +146,7 @@ extension IntegrationTestSuites {
         @Test(.timeLimit(.minutes(2)), arguments: TestMuxer.allCases, TestSecurity.allCases)
         func testInternalInteropMultipleRequests_Sequentially(muxer: TestMuxer, security: TestSecurity) async throws {
             await withKnownIssue("Sometimes these tests timeout", isIntermittent: true) {
-                try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+                try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                     let addr = try host.dialableAddress
                     let message = Data("Hello Swift LibP2P".utf8)
                     let numberOfRequests = 500
@@ -181,10 +182,9 @@ extension IntegrationTestSuites {
         ) async throws {
             await withKnownIssue("Sometimes these tests timeout", isIntermittent: true) {
                 try await withPeers(
-                    muxer: muxer.provider,
-                    security: security.provider,
                     installEchoOnHost: true,
-                    installEchoOnClient: true
+                    installEchoOnClient: true,
+                    configure: testStack(muxer: muxer, security: security)
                 ) { peer1, peer2 in
                     let peer1Address = try peer1.dialableAddress
                     let peer2Address = try peer2.dialableAddress

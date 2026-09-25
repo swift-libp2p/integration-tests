@@ -14,6 +14,7 @@
 
 import Foundation
 import NIOCore
+import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -32,7 +33,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func idleConnectionAndStreamsTearThemselvesDown(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 let recorder = EventRecorder()
                 recorder.subscribe(to: client)
 
@@ -55,9 +56,8 @@ extension IntegrationTestSuites {
         @Test(arguments: TestMuxer.allCases)
         func idleConnectionTearsDownWithAutomaticStreamCounting(muxer: TestMuxer) async throws {
             try await withPeers(
-                muxer: muxer.provider,
-                security: TestSecurity.noise.provider,
-                enableAutomaticStreamCounting: true
+                enableAutomaticStreamCounting: true,
+                configure: testStack(muxer: muxer)
             ) { host, client in
                 client.connectionManager.setIdleTimeout(.milliseconds(500))
 
