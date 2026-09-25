@@ -22,8 +22,9 @@ import Testing
 /// teardown), the now-empty connection reaps itself after its idle timeout (idle *connection*
 /// teardown).
 ///
-/// The default `ARCConnection` self-closes ~250ms after its last stream closes; the connection
-/// manager's automatic-stream-counting path is a second, configurable option for the same condition.
+/// The default `BaseConnection` arms an idle timer when it drops to zero open streams and closes
+/// itself if the timer fires without a new stream having been opened. The connection manager's
+/// automatic-stream-counting path is a second, configurable option for the same condition.
 extension IntegrationTestSuites {
 
     @Suite("Idle Teardown Tests", .timeLimit(.minutes(2)))
