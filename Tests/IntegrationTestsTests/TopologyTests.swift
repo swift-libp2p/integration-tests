@@ -14,8 +14,8 @@
 
 import Foundation
 import LibP2PCore
-import NIOConcurrencyHelpers
 import LibP2PTesting
+import NIOConcurrencyHelpers
 import Testing
 
 @testable import LibP2P
