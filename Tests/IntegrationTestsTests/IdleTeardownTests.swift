@@ -13,8 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
-import NIOCore
 import LibP2PTesting
+import NIOCore
 import Testing
 
 @testable import LibP2P

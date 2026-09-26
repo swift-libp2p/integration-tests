@@ -15,8 +15,8 @@
 import LibP2PMPLEX
 import LibP2PNoise
 import LibP2PPlaintext
-import LibP2PYAMUX
 import LibP2PTesting
+import LibP2PYAMUX
 import Testing
 
 @testable import LibP2P

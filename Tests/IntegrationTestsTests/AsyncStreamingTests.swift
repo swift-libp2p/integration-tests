@@ -13,9 +13,9 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import LibP2PTesting
 import NIOConcurrencyHelpers
 import NIOCore
-import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -85,7 +85,7 @@ extension IntegrationTestSuites {
         ///
         /// Each side waits for the *other* stream to have received a reply before finishing, so the
         /// two streams are provably open simultaneously. If the muxer serialized them, the wait
-        /// fails rather than hanging.
+        /// fails rather than stalling.
         @Test(arguments: TestMuxer.allCases)
         func concurrentStreamsShareOneConnection(muxer: TestMuxer) async throws {
             try await withPeers(
