@@ -2,7 +2,7 @@
 //
 // This source file is part of the swift-libp2p open source project
 //
-// Copyright (c) 2022-2025 swift-libp2p project authors
+// Copyright (c) 2022-2026 swift-libp2p project authors
 // Licensed under MIT
 //
 // See LICENSE for license information
@@ -16,6 +16,7 @@ import Foundation
 import LibP2PMPLEX
 import LibP2PNoise
 import LibP2PPlaintext
+import LibP2PTesting
 import LibP2PYAMUX
 import Testing
 
@@ -23,10 +24,6 @@ import Testing
 
 /// End-to-end ping / echo interop between two real `Application` nodes over a loopback TCP socket,
 /// swept across every muxer × security combination.
-///
-/// Lifecycle (make → configure → startup → shutdown) is delegated to the shared ``withPeers``
-/// helper (the networked analogue of `LibP2PTesting.withApp`), so nodes are always torn down — even
-/// when an assertion path throws — and ports are auto-picked (`/tcp/0`) so the suite never collides.
 extension IntegrationTestSuites {
 
     @Suite("Internal Integration Tests", .timeLimit(.minutes(5)))
@@ -34,7 +31,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func testLibP2PInternalPingMultiaddr(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+            try await withPeers(installEchoOnHost: false, configure: testStack(muxer: muxer, security: security)) {
                 host,
                 client in
                 let ping = try await client.identify.ping(addr: host.dialableAddress)
@@ -45,7 +42,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func testLibP2PInternalPingPeer(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+            try await withPeers(installEchoOnHost: false, configure: testStack(muxer: muxer, security: security)) {
                 host,
                 client in
                 try await client.peers.add(peerInfo: host.peerInfo)
@@ -61,7 +58,7 @@ extension IntegrationTestSuites {
             muxer: TestMuxer,
             security: TestSecurity
         ) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+            try await withPeers(installEchoOnHost: false, configure: testStack(muxer: muxer, security: security)) {
                 host,
                 client in
                 try await client.peers.add(peerInfo: host.peerInfo)
@@ -76,8 +73,8 @@ extension IntegrationTestSuites {
                 let ping2 = try await latency2
                 let ping3 = try await latency3
 
-                let connectionCount = try await client.connectionManager.getTotalConnectionCount().get()
-                let streamCount = try await client.connectionManager.getTotalStreamCount().get()
+                let connectionCount = try await client.connectionManager.getTotalConnectionCount()
+                let streamCount = try await client.connectionManager.getTotalStreamCount()
 
                 print("Connection Count: \(connectionCount)")
                 print("Stream Count: \(streamCount)")
@@ -97,7 +94,7 @@ extension IntegrationTestSuites {
             muxer: TestMuxer,
             security: TestSecurity
         ) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider, installEchoOnHost: false) {
+            try await withPeers(installEchoOnHost: false, configure: testStack(muxer: muxer, security: security)) {
                 host,
                 client in
                 try await client.peers.add(peerInfo: host.peerInfo)
@@ -107,8 +104,8 @@ extension IntegrationTestSuites {
                 let ping2 = try await client.identify.ping(peer: host.peerID)
                 let ping3 = try await client.identify.ping(peer: host.peerID)
 
-                let connectionCount = try await client.connectionManager.getTotalConnectionCount().get()
-                let streamCount = try await client.connectionManager.getTotalStreamCount().get()
+                let connectionCount = try await client.connectionManager.getTotalConnectionCount()
+                let streamCount = try await client.connectionManager.getTotalStreamCount()
 
                 print("Connection Count: \(connectionCount)")
                 print("Stream Count: \(streamCount)")
@@ -125,7 +122,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func testInternalInterop(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 let message = Data("Hello Swift LibP2P".utf8)
 
                 /// Fire off an echo request
@@ -134,7 +131,7 @@ extension IntegrationTestSuites {
                     forProtocol: "/echo/1.0.0",
                     withRequest: message,
                     withHandlers: .handlers([.newLineDelimited])
-                ).get()
+                )
 
                 #expect(response == message)
 
@@ -145,7 +142,7 @@ extension IntegrationTestSuites {
         @Test(.timeLimit(.minutes(2)), arguments: TestMuxer.allCases, TestSecurity.allCases)
         func testInternalInteropMultipleRequests_Sequentially(muxer: TestMuxer, security: TestSecurity) async throws {
             await withKnownIssue("Sometimes these tests timeout", isIntermittent: true) {
-                try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+                try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                     let addr = try host.dialableAddress
                     let message = Data("Hello Swift LibP2P".utf8)
                     let numberOfRequests = 500
@@ -158,15 +155,15 @@ extension IntegrationTestSuites {
                             forProtocol: "/echo/1.0.0",
                             withRequest: message,
                             withHandlers: .handlers([.newLineDelimited])
-                        ).get()
+                        )
 
                         #expect(response == message)
                     }
 
                     try await Task.sleep(for: .milliseconds(10))
 
-                    let connections = try await host.connectionManager.getTotalConnectionCount().get()
-                    let streams = try await host.connectionManager.getTotalStreamCount().get()
+                    let connections = try await host.connectionManager.getTotalConnectionCount()
+                    let streams = try await host.connectionManager.getTotalStreamCount()
 
                     #expect(connections == 1)
                     #expect(streams == numberOfRequests + 2)
@@ -181,10 +178,9 @@ extension IntegrationTestSuites {
         ) async throws {
             await withKnownIssue("Sometimes these tests timeout", isIntermittent: true) {
                 try await withPeers(
-                    muxer: muxer.provider,
-                    security: security.provider,
                     installEchoOnHost: true,
-                    installEchoOnClient: true
+                    installEchoOnClient: true,
+                    configure: testStack(muxer: muxer, security: security)
                 ) { peer1, peer2 in
                     let peer1Address = try peer1.dialableAddress
                     let peer2Address = try peer2.dialableAddress
@@ -198,7 +194,7 @@ extension IntegrationTestSuites {
                             forProtocol: "/echo/1.0.0",
                             withRequest: Data("Hello from peer1".utf8),
                             withHandlers: .handlers([.newLineDelimited])
-                        ).get()
+                        )
 
                         /// Fire off an echo request
                         async let p2ToP1 = peer2.newRequest(
@@ -206,7 +202,7 @@ extension IntegrationTestSuites {
                             forProtocol: "/echo/1.0.0",
                             withRequest: Data("Hello from peer2".utf8),
                             withHandlers: .handlers([.newLineDelimited])
-                        ).get()
+                        )
 
                         let responses = try await [p1ToP2, p2ToP1]
                         #expect(responses.first == Data("Hello from peer1".utf8))
@@ -215,14 +211,14 @@ extension IntegrationTestSuites {
 
                     try await Task.sleep(for: .milliseconds(10))
 
-                    let connectionsP1 = try await peer1.connectionManager.getTotalConnectionCount().get()
-                    let streamsP1 = try await peer1.connectionManager.getTotalStreamCount().get()
+                    let connectionsP1 = try await peer1.connectionManager.getTotalConnectionCount()
+                    let streamsP1 = try await peer1.connectionManager.getTotalStreamCount()
 
                     #expect(connectionsP1 == 2)
                     #expect(streamsP1 == (numberOfRequests + 2) * 2)
 
-                    let connectionsP2 = try await peer2.connectionManager.getTotalConnectionCount().get()
-                    let streamsP2 = try await peer2.connectionManager.getTotalStreamCount().get()
+                    let connectionsP2 = try await peer2.connectionManager.getTotalConnectionCount()
+                    let streamsP2 = try await peer2.connectionManager.getTotalStreamCount()
 
                     #expect(connectionsP2 == 2)
                     #expect(streamsP2 == (numberOfRequests + 2) * 2)

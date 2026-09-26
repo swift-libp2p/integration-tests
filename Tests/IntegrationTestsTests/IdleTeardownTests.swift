@@ -2,7 +2,7 @@
 //
 // This source file is part of the swift-libp2p open source project
 //
-// Copyright (c) 2022-2025 swift-libp2p project authors
+// Copyright (c) 2022-2026 swift-libp2p project authors
 // Licensed under MIT
 //
 // See LICENSE for license information
@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import LibP2PTesting
 import NIOCore
 import Testing
 
@@ -22,8 +23,9 @@ import Testing
 /// teardown), the now-empty connection reaps itself after its idle timeout (idle *connection*
 /// teardown).
 ///
-/// The default `ARCConnection` self-closes ~250ms after its last stream closes; the connection
-/// manager's automatic-stream-counting path is a second, configurable option for the same condition.
+/// The default `BaseConnection` arms an idle timer when it drops to zero open streams and closes
+/// itself if the timer fires without a new stream having been opened. The connection manager's
+/// automatic-stream-counting path is a second, configurable option for the same condition.
 extension IntegrationTestSuites {
 
     @Suite("Idle Teardown Tests", .timeLimit(.minutes(2)))
@@ -31,14 +33,14 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func idleConnectionAndStreamsTearThemselvesDown(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 let recorder = EventRecorder()
                 recorder.subscribe(to: client)
 
                 _ = try await client.echo(Data("idle".utf8), to: host.dialableAddress)
 
                 // Exactly one connection was opened for the request.
-                let opened = try await client.connectionManager.getTotalConnectionCount().get()
+                let opened = try await client.connectionManager.getTotalConnectionCount()
                 #expect(opened == 1)
 
                 // Idle stream teardown: the request's sub-stream closes.
@@ -54,9 +56,8 @@ extension IntegrationTestSuites {
         @Test(arguments: TestMuxer.allCases)
         func idleConnectionTearsDownWithAutomaticStreamCounting(muxer: TestMuxer) async throws {
             try await withPeers(
-                muxer: muxer.provider,
-                security: TestSecurity.noise.provider,
-                enableAutomaticStreamCounting: true
+                enableAutomaticStreamCounting: true,
+                configure: testStack(muxer: muxer)
             ) { host, client in
                 client.connectionManager.setIdleTimeout(.milliseconds(500))
 

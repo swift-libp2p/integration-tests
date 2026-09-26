@@ -14,6 +14,7 @@
 
 import Foundation
 import LibP2PCore
+import LibP2PTesting
 import Testing
 
 @testable import LibP2P
@@ -27,7 +28,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func identifyPopulatesTheDialersPeerStore(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 // A single echo request establishes the connection and triggers Identify.
                 _ = try await client.echo(Data("peerstore".utf8), to: host.dialableAddress)
 
@@ -59,7 +60,7 @@ extension IntegrationTestSuites {
         }
 
         @Test func manuallyAddedPeerInfoIsStored() async throws {
-            try await withPeers(installEchoOnHost: false) { host, client in
+            try await withPeers(installEchoOnHost: false, configure: testStack()) { host, client in
                 try await client.peers.add(peerInfo: host.peerInfo)
 
                 let key = try await client.peers.getKey(forPeer: host.peerID.b58String).get()

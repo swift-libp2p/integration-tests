@@ -14,6 +14,7 @@
 
 import Foundation
 import LibP2PCore
+import LibP2PTesting
 import NIOConcurrencyHelpers
 import Testing
 
@@ -28,7 +29,7 @@ extension IntegrationTestSuites {
 
         @Test(arguments: TestMuxer.allCases, TestSecurity.allCases)
         func topologyNotifiesOnConnectAndDisconnect(muxer: TestMuxer, security: TestSecurity) async throws {
-            try await withPeers(muxer: muxer.provider, security: security.provider) { host, client in
+            try await withPeers(configure: testStack(muxer: muxer, security: security)) { host, client in
                 let connectedPeer = NIOLockedValueBox<String?>(nil)
                 let disconnectedPeer = NIOLockedValueBox<String?>(nil)
 
@@ -56,7 +57,7 @@ extension IntegrationTestSuites {
 
         /// A topology registered for a protocol nobody advertises must never be notified.
         @Test func topologyIsNotNotifiedForUnsupportedProtocol() async throws {
-            try await withPeers { host, client in
+            try await withPeers(configure: testStack()) { host, client in
                 let notified = NIOLockedValueBox<Bool>(false)
                 client.topology.register(
                     TopologyRegistration(

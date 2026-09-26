@@ -15,6 +15,7 @@
 import LibP2PMPLEX
 import LibP2PNoise
 import LibP2PPlaintext
+import LibP2PTesting
 import LibP2PYAMUX
 import Testing
 
@@ -27,7 +28,7 @@ extension IntegrationTestSuites {
 
         @Test func testExternalPingMultiaddr() async throws {
             await withKnownIssue("Sometimes we cant reach the external node...", isIntermittent: true) {
-                try await withNode(muxer: .yamux, security: .noise) { app in
+                try await withNode(configure: testStack()) { app in
                     let ma = try Multiaddr(
                         "/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ"
                     )
@@ -45,7 +46,7 @@ extension IntegrationTestSuites {
 
         @Test func testExternalPingMultiaddrFromDNS() async throws {
             await withKnownIssue("Sometimes we cant reach the external node...", isIntermittent: true) {
-                try await withNode(muxer: .yamux, security: .noise) { app in
+                try await withNode(configure: testStack()) { app in
                     let ma = try Multiaddr(
                         "/dns/sv15.bootstrap.libp2p.io/tcp/4001/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN"
                     )
