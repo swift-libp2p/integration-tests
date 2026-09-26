@@ -2,7 +2,7 @@
 //
 // This source file is part of the swift-libp2p open source project
 //
-// Copyright (c) 2022-2025 swift-libp2p project authors
+// Copyright (c) 2022-2026 swift-libp2p project authors
 // Licensed under MIT
 //
 // See LICENSE for license information
@@ -40,7 +40,7 @@ extension IntegrationTestSuites {
                 _ = try await client.echo(Data("idle".utf8), to: host.dialableAddress)
 
                 // Exactly one connection was opened for the request.
-                let opened = try await client.connectionManager.getTotalConnectionCount().get()
+                let opened = try await client.connectionManager.getTotalConnectionCount()
                 #expect(opened == 1)
 
                 // Idle stream teardown: the request's sub-stream closes.

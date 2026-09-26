@@ -2,7 +2,7 @@
 //
 // This source file is part of the swift-libp2p open source project
 //
-// Copyright (c) 2022-2025 swift-libp2p project authors
+// Copyright (c) 2022-2026 swift-libp2p project authors
 // Licensed under MIT
 //
 // See LICENSE for license information
@@ -39,7 +39,7 @@ extension IntegrationTestSuites {
                     #expect(try await client.echo(message, to: addr) == message)
                 }
 
-                let total = try await client.connectionManager.getTotalConnectionCount().get()
+                let total = try await client.connectionManager.getTotalConnectionCount()
                 #expect(total == 1)
             }
         }
@@ -65,7 +65,7 @@ extension IntegrationTestSuites {
                     }
                 }
 
-                let total = try await client.connectionManager.getTotalConnectionCount().get()
+                let total = try await client.connectionManager.getTotalConnectionCount()
                 #expect(total == 1)
             }
         }
@@ -88,13 +88,13 @@ extension IntegrationTestSuites {
                     }
                 }
 
-                let total = try await client.connectionManager.getTotalConnectionCount().get()
+                let total = try await client.connectionManager.getTotalConnectionCount()
                 #expect(total == 1)
             }
         }
 
         /// Coalescing keys on the dialed multiaddr, so concurrent cold dials to two different peers must
-        /// stay independent — one connection per peer, never collapsed together.
+        /// stay independent, one connection per peer, never collapsed together.
         @Test func concurrentColdDialsToDifferentPeersStayIndependent() async throws {
             try await withPeers(configure: testStack()) { hostA, client in
                 try await withNode(installEcho: true, configure: testStack()) { hostB in
@@ -112,8 +112,8 @@ extension IntegrationTestSuites {
                         }
                     }
 
-                    // One connection to each distinct peer — the two dial targets did not coalesce.
-                    let total = try await client.connectionManager.getTotalConnectionCount().get()
+                    // One connection to each distinct peer, the two dial targets did not coalesce.
+                    let total = try await client.connectionManager.getTotalConnectionCount()
                     #expect(total == 2)
                 }
             }
