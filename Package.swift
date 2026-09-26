@@ -29,10 +29,10 @@ let package = Package(
         .package(url: "https://github.com/swift-libp2p/swift-libp2p.git", .upToNextMinor(from: "0.4.0")),
 
         // Test Dependencies
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-yamux.git", .upToNextMinor(from: "0.4.0")),
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-mplex.git", .upToNextMinor(from: "0.4.0")),
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-noise.git", .upToNextMinor(from: "0.4.0")),
-        .package(url: "https://github.com/swift-libp2p/swift-libp2p-plaintext.git", .upToNextMinor(from: "0.4.0")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-yamux.git", .upToNextMinor(from: "0.3.4")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-mplex.git", .upToNextMinor(from: "0.3.3")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-noise.git", .upToNextMinor(from: "0.3.1")),
+        .package(url: "https://github.com/swift-libp2p/swift-libp2p-plaintext.git", .upToNextMinor(from: "0.3.1")),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
